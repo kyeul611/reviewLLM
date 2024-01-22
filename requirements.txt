@@ -1,0 +1,5 @@
+chromedriver_autoinstaller
+selenium
+beautifulsoup4
+pymongo
+python-dotenv

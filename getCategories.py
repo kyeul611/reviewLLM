@@ -18,6 +18,11 @@
                 ],
             }
         },
+
+    Naver = [
+        
+
+    ]
         
         ## 또는 
 
@@ -43,11 +48,12 @@ from selenium.common.exceptions import NoSuchElementException
 
 import chromedriver_autoinstaller
 
-import pymongo
+from pymongo import MongoClient
 import json
 
 import time
 import re
+from dotenv import dotenv_values
 
 import concurrent.futures
 
@@ -59,12 +65,23 @@ def raiseChromeDriver():
 
     options.add_argument("--start-maximized")
     options.add_argument(f"user-agent={user_agent}")
+    # options.add_argument("--headless")
     driver = webdriver.Chrome(options=options)
     return driver
 
 
-def saveData(data, name):
-    pass
+def saveData(config, name, data):
+    '''
+    데이터를 받아 "name" collection에 data를 저장하는 메서드
+    '''
+    mongodb_client = MongoClient(config['MONGODB_ATLAS'])
+    db = mongodb_client.reviewLLM_db
+    collection = db[name]
+    collection.insert_one(data)
+
+    mongodb_client.close()
+
+
 
 def getNaverCate():
     '''
@@ -75,7 +92,6 @@ def getNaverCate():
     driver = raiseChromeDriver()
     url = 'https://shopping.naver.com/home'
     driver.get(url)
-    time.sleep(2)
 
     # 카테고리 탭 클릭
     try:
@@ -91,8 +107,9 @@ def getNaverCate():
     )[0]
     # main_categories = driver.find_element(By.CLASS_NAME, '_categoryLayer_main_category_2A7mb')
     main_li_list = main_categories.find_elements(By.CLASS_NAME, '_categoryLayer_list_34UME') 
-    for main_li_tag in main_li_list:
+    for i, main_li_tag in enumerate(main_li_list):
         # time.sleep(0.1)
+        print(i, main_li_tag.text)
 
         # 메인 카테고리 저장
         category_data[main_li_tag.text] = []
@@ -102,8 +119,10 @@ def getNaverCate():
         middle_categories = driver.find_element(By.CLASS_NAME, '_categoryLayer_middle_category_2g2zY')
         middle_li_list = middle_categories.find_elements(By.CLASS_NAME, '_categoryLayer_list_34UME')
     
-        for middle_li_tag in middle_li_list:
+        for j, middle_li_tag in enumerate(middle_li_list):
             # time.sleep(0.1)
+            print("     ", j, middle_li_tag.text)
+
             actions = ActionChains(driver)
             actions.move_to_element(middle_li_tag).perform()
 
@@ -112,10 +131,17 @@ def getNaverCate():
                 subclass_list = subclass.find_elements(By.CLASS_NAME, '_categoryLayer_list_34UME')
                 
                 for sub_li in subclass_list:
-                    a_tag = sub_li.find_element(By.CSS_SELECTOR, 'a')
-                    href = a_tag.get_attribute('href')
-                    cat_id = re.search(r'catId=(\d+)', href).group(1)
-
+                    # a_tag = sub_li.find_element(By.CSS_SELECTOR, 'a')
+                    # a_tag = sub_li.find_element(By.CLASS_NAME, '_categoryLayer_link_2sZdW')
+                    a_tag = WebDriverWait(sub_li, 10).until(
+                        EC.presence_of_all_elements_located((By.CSS_SELECTOR, 'a'))
+                    )[0]
+                    try:
+                        href = a_tag.get_attribute('href')
+                        cat_id = re.search(r'catId=(\d+)', href).group(1)
+                    except:
+                        print(a_tag.get_attribute())
+                        exit()
                     # save to dictionary
                     main_category = main_li_tag.text
                     rest_data = f"{middle_li_tag.text}/{sub_li.text}"
@@ -124,14 +150,16 @@ def getNaverCate():
 
                 
             except NoSuchElementException as e:
-                a_tag = middle_li_tag.find_element(By.CSS_SELECTOR, "a")
+                # a_tag = middle_li_tag.find_element(By.CSS_SELECTOR, "a")
+                # a_tag = middle_li_tag.find_element(By.CLASS_NAME, '_categoryLayer_link_2sZdW')
+                a_tag = WebDriverWait(middle_li_tag, 10).until(
+                        EC.presence_of_all_elements_located((By.CSS_SELECTOR, 'a'))
+                    )[0]
                 href = a_tag.get_attribute('href')
                 cat_id = re.search(r'catId=(\d+)', href).group(1)
 
                 category_data[main_category].append({rest_data : int(cat_id)})
-    
 
-        # print(json.dumps(category_data, indent=2, ensure_ascii=False))
     return "Naver", category_data
 
 def getCoupangCate():
@@ -143,17 +171,19 @@ def getCoupangCate():
 
 
 if __name__=="__main__":
+    config = dotenv_values(".env")
+
     # pass
     with concurrent.futures.ProcessPoolExecutor() as executor:
         future1 = executor.submit(getNaverCate)
-        # future1 = executor.submit(getCoupangCate)
+        future2 = executor.submit(getCoupangCate)
+        
 
-        future1.result()
-
-        # for future in concurrent.futures.as_completed(future1):
-        #     try:
-        #         result = future.result()
+        for future in concurrent.futures.as_completed([future1, future2]):
+            try:
+                name, data = future.result()
+                saveData(name, data)
             
-        #     except Exception as e:
-        #         print(e)
+            except Exception as e:
+                print(e)
 

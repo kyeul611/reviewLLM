@@ -118,7 +118,7 @@ def getNaverCate():
 
                     # save to dictionary
                     main_category = main_li_tag.text
-                    rest_data = f"{middle_li_tag.text}/{sub_li.text}"
+                    rest_data = f"{middle_li_tag.text}-{sub_li.text}"
                     
                     category_data[main_category].append({rest_data : int(cat_id)})
 
@@ -130,8 +130,8 @@ def getNaverCate():
 
                 category_data[main_category].append({rest_data : int(cat_id)})
     
-
-        # print(json.dumps(category_data, indent=2, ensure_ascii=False))
+        result = json.dumps(category_data[main_li_tag.text], indent=2, ensure_ascii=False)
+        print(result)
     return "Naver", category_data
 
 def getCoupangCate():

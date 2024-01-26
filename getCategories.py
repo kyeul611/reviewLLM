@@ -4,7 +4,7 @@
 
 수집한 데이터는 어떤 형식으로 저장할까?
     {
-        "Naver":{
+        "Naver":[
             {
                 대분류:[
                     {"중분류/소분류":ID값},
@@ -17,7 +17,7 @@
                     {"중분류/소분류":ID값},
                 ],
             }
-        },
+        ],
 
     Naver = [
         
@@ -215,7 +215,6 @@ def getCoupangCate():
                 category_data[main_category].append({rest_data: int(cat_id)})
 
     result = json.dumps(category_data, indent=2, ensure_ascii=False)
-    print(result)
     return "Coupang", category_data
 
         

@@ -4,34 +4,80 @@
 
 수집한 데이터는 어떤 형식으로 저장할까?
     {
-        "Naver":[
+        "Naver":
             {
-                대분류:[
-                    {"중분류/소분류":ID값},
-                    {"중분류/소분류":ID값},
-                    {"중분류/소분류":ID값},
-                ],
-                대분류:[
-                    {"중분류/소분류":ID값},
-                    {"중분류/소분류":ID값},
-                    {"중분류/소분류":ID값},
-                ],
-            }
+                대분류:{
+                    id: 값,
+                    중분류:{
+                        ID: 값,
+                        소분류: {ID: 값},
+                        소분류: {ID: 값},
+                        소분류: {ID: 값},
+                        소분류: {ID: 값},
+                    },
+                    중분류:{
+                        ID: 값,
+                        소분류: {ID: 값},
+                        소분류: {ID: 값},
+                        소분류: {ID: 값},
+                        소분류: {ID: 값},
+                    },
+                    중분류:{
+                        ID: 값,
+                        소분류: {ID: 값},
+                        소분류: {ID: 값},
+                        소분류: {ID: 값},
+                        소분류: {ID: 값},
+                    },
+                },
+                대분류:{
+                    id: 값,
+                    중분류:{
+                        ID: 값,
+                        소분류: {ID: 값},
+                        소분류: {ID: 값},
+                        소분류: {ID: 값},
+                        소분류: {ID: 값},
+                    },
+                
+                },
+                    {
+                        중분류:{
+                            소분류: ID값,
+                            소분류: ID값,
+                            소분류: ID값,
+                        }   
+                    },
+                    {
+                        중분류:[
+                            {소분류: ID값},
+                            {소분류: ID값},
+                            {소분류: ID값},
+                        ],
+                        중분류:
+                            
+                    },
+                ]
+                    
+            },
+            {
+                대분류:
+                    {
+                        중분류:
+                            {소분류: ID값},
+                            {소분류: ID값},
+                            {소분류: ID값},
+                    },
+                    {
+                        중분류:
+                            {소분류: ID값},
+                            {소분류: ID값},
+                            {소분류: ID값},
+                    },
+            },
         ],
-
-    Naver = [
-        
-
-    ]
-        
-        ## 또는 
-
-        "Coupang":[
-            {"대분류/중분류/소분류":ID값},
-            {"대분류/중분류/소분류":ID값}
-        ]
     }
-    
+
 
 
 '''
@@ -44,7 +90,7 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import NoSuchElementException
+from selenium.common.exceptions import NoSuchElementException, TimeoutException, StaleElementReferenceException
 
 import chromedriver_autoinstaller
 
@@ -53,6 +99,7 @@ import json
 
 import time
 import re
+from tqdm import tqdm
 from dotenv import dotenv_values
 
 import concurrent.futures
@@ -69,7 +116,7 @@ def raiseChromeDriver():
     options.add_argument("--start-maximized")
     options.add_argument("--window-size=1920,1080")
     options.add_argument(f"user-agent={user_agent}")
-    # options.add_argument("--headless")
+    options.add_argument("--headless")
     driver = webdriver.Chrome(options=options)
     return driver
 
@@ -81,82 +128,121 @@ def saveData(config, name, data):
     mongodb_client = MongoClient(config['MONGODB_ATLAS'])
     db = mongodb_client.reviewLLM_db
     collection = db[name]
-    result = collection.update_one(data, upsert=True)
-    if result.upserted_id:
-        print(result.upserted_id)
+    # result = collection.insert_many(data).inserted_ids
+    for row in data:
+        result = collection.insert_one(row).inserted_id
+        if result:
+            print(result)
     
     mongodb_client.close()
+
 
 
 def getNaverCate():
     '''
     네이버 쇼핑 페이지에 접근한 후, 카테고리를 순회하며 ID값을 수집함
     '''
-    category_data = {}
+
+    def getNaverIDvalue(href):
+        '''
+        href에서 카테고리 ID를 추출하는 함수
+        '''
+        cat_id = int(re.search(r'catId=(\d+)', href).group(1))
+
+        return cat_id
+
+    category_data = []
 
     driver = raiseChromeDriver()
     url = 'https://shopping.naver.com/home'
     driver.get(url)
 
     # 카테고리 탭 클릭
-    element = WebDriverWait(driver, 10).until(
+    WebDriverWait(driver, 10).until(
         EC.presence_of_element_located((By.CLASS_NAME, '_categoryButton_category_3_5ml'))
-    )
-    element.click()
-        
-    main_categories = WebDriverWait(driver, 10).until(
+    ).click()
+    
+    # 메인 카테고리 태그들이 로딩되고 나면 원소 찾기
+    main_category = WebDriverWait(driver, 10).until(
         EC.presence_of_element_located((By.CLASS_NAME, '_categoryLayer_main_category_2A7mb'))
     )
-    # main_categories = driver.find_element(By.CLASS_NAME, '_categoryLayer_main_category_2A7mb')
-    main_li_list = main_categories.find_elements(By.CLASS_NAME, '_categoryLayer_list_34UME') 
-    for main_li_tag in main_li_list:
+    # 메인카테고리 li 태그들
+    main_li_list = main_category.find_elements(By.CLASS_NAME, '_categoryLayer_list_34UME') 
+    
+    # 메인 카테고리 순회
+    for main_li_tag in tqdm(main_li_list, desc="네이버 카테고리 수집"):
+        main_categories = {}
         # time.sleep(0.1)
 
         # 메인 카테고리 저장
         main_category = main_li_tag.text
-        category_data[main_category] = []
 
         actions = ActionChains(driver)
         actions.move_to_element(main_li_tag).perform()
-        middle_categories = driver.find_element(By.CLASS_NAME, '_categoryLayer_middle_category_2g2zY')
-        middle_li_list = middle_categories.find_elements(By.CLASS_NAME, '_categoryLayer_list_34UME')
-    
-        for middle_li_tag in middle_li_list:
+
+        # 메인 카테고리 ID값 찾기
+        main_a_tag = main_li_tag.find_element(By.CSS_SELECTOR, 'a')
+        main_href = main_a_tag.get_attribute('href')
+        main_categories['ID'] = getNaverIDvalue(main_href)
+
+        # 중간 카테고리 태그들 찾기
+        middle_category = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.CLASS_NAME, '_categoryLayer_middle_category_2g2zY'))
+        )
+        middle_li_list = middle_category.find_elements(By.CLASS_NAME, '_categoryLayer_list_34UME')
+        
+        # 중간 카테고리 순회
+        for middle_li_tag in tqdm(middle_li_list, desc=f"   {main_li_tag.text} 항목 수집 중", leave=False):
+            middle_categories = {}    
+            
             # time.sleep(0.1)
             actions = ActionChains(driver)
             actions.move_to_element(middle_li_tag).perform()
+
+            # 중간 카테고리 ID값 저장
+            middle_a_tag = middle_li_tag.find_element(By.CSS_SELECTOR, 'a')
+            middle_href = middle_a_tag.get_attribute('href')
+            middle_categories["ID"] = getNaverIDvalue(middle_href) 
+
+            '''
+            하위 카테고리가 있는 경우 데이터를 수집한다.
+            '''
             try:
-                subclass = driver.find_element(By.CLASS_NAME, '_categoryLayer_subclass_1K649')
-                subclass_list = subclass.find_elements(By.CLASS_NAME, '_categoryLayer_list_34UME')
-                for sub_li in subclass_list:
+                sub_category = driver.find_element(By.CLASS_NAME, '_categoryLayer_subclass_1K649')
+            except NoSuchElementException:
+                continue
+
+            subclass_list = sub_category.find_elements(By.CLASS_NAME, '_categoryLayer_list_34UME')
+            
+            # 하위 카테고리 순회
+            for sub_li in subclass_list:
+                sub_categoris = {} # 하위 카테고리 값들을 저장할 임시 변수
+                # 하위 카테고리 ID값 찾기
+                try:
                     a_tag = WebDriverWait(sub_li, 10).until(
                         EC.presence_of_element_located((By.CSS_SELECTOR, 'a'))
                     )
-                    try:
-                        href = a_tag.get_attribute('href')
-                        cat_id = re.search(r'catId=(\d+)', href).group(1)
-                    except:
-                        print(a_tag.get_attribute())
-                        exit()
-                    # save to dictionary
-                    rest_data = f"{middle_li_tag.text}-{sub_li.text}"
-                    
-                    category_data[main_category].append({rest_data : int(cat_id)})
-            
-            # 하위 카테고리가 없는 항목은 중위 카테고리 정보만 가져온다.
-            except NoSuchElementException:
-                a_tag = WebDriverWait(middle_li_tag, 10).until(
-                        EC.presence_of_element_located((By.CSS_SELECTOR, 'a'))
-                    )
-                href = a_tag.get_attribute('href')
-                
-                cat_id = re.search(r'catId=(\d+)', href).group(1)
-                rest_data = f"{middle_li_tag.text}"
 
-                category_data[main_category].append({rest_data : int(cat_id)})
-    
-        # result = json.dumps(category_data[main_li_tag.text], indent=2, ensure_ascii=False)
+                    sub_href = a_tag.get_attribute('href')
+                    sub_categoris["ID"] = getNaverIDvalue(sub_href)
+                    
+                    # 중간 카테고리에 하위 카테고리 저장
+                    middle_categories[sub_li.text] = sub_categoris
+                
+                except StaleElementReferenceException:
+                    print(sub_li)
+                    print(sub_li.get_property("attributes"))
+                    print(a_tag)
+                    print(a_tag.get_property("attributes"))
+                    exit()
+
+           
+            main_categories[middle_li_tag.text] = middle_categories
+        # category_data[main_li_tag.text]=main_categories
+        category_data.append({main_li_tag.text:main_categories})
+        # result = json.dumps(category_data, indent=2, ensure_ascii=False)
         # print(result)
+        # exit()
     return "Naver", category_data
 
 def getCoupangCate():
@@ -177,7 +263,7 @@ def getCoupangCate():
     # 메인 카테고리 정보 가져오기
     main_categories = driver.find_element(By.CLASS_NAME, 'category-layer')
     main_li_list = main_categories.find_elements(By.CSS_SELECTOR, 'ul.menu > li')
-    for main_li_tag in main_li_list:
+    for main_li_tag in tqdm(main_li_list, desc="쿠팡 카테고리 수집"):
         main_category = main_li_tag.text
         category_data[main_category] = []
 
@@ -186,7 +272,6 @@ def getCoupangCate():
 
         middle_li_list = main_li_tag.find_elements(By.CLASS_NAME, 'second-depth-list')
         for middle_li_tag in middle_li_list:
-
             action = ActionChains(driver)
             action.move_to_element(middle_li_tag).perform()
             middle_category = middle_li_tag.find_element(By.CSS_SELECTOR, 'a')
@@ -214,7 +299,6 @@ def getCoupangCate():
 
                 category_data[main_category].append({rest_data: int(cat_id)})
 
-    result = json.dumps(category_data, indent=2, ensure_ascii=False)
     return "Coupang", category_data
 
         
@@ -224,10 +308,17 @@ if __name__=="__main__":
     config = dotenv_values(".env")
 
     with concurrent.futures.ProcessPoolExecutor() as executor:
-        # future1 = executor.submit(getNaverCate)
-        future2 = executor.submit(getCoupangCate)
+        future1 = executor.submit(getNaverCate)
+        # future2 = executor.submit(getCoupangCate)
         
-        future2.result()
+        name, data = future1.result()
+        # result = json.dumps(data, indent=2, ensure_ascii=False)
+        # print(result)
+
+        saveData(config, name, data)
+        # for key, value in data.items():
+        #     print(f"{key}:{value}")
+        #     print()
 
         # for future in concurrent.futures.as_completed([future1, future2]):
         #     try:

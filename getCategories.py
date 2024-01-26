@@ -140,7 +140,7 @@ def getNaverCate():
                         href = a_tag.get_attribute('href')
                         cat_id = re.search(r'catId=(\d+)', href).group(1)
                     except:
-                        print(a_tag.get_attribute())
+                        print(a_tag.get_attribute("outerHTML"))
                         exit()
                     # save to dictionary
                     main_category = main_li_tag.text

@@ -187,6 +187,7 @@ def getNaverCate():
 
     category_data = {
         "collection_name" : "Naver",
+        "iscollect": False,
         "sub_data" : [],
     }
 
@@ -226,6 +227,7 @@ def getNaverCate():
             "Level": "대분류",
             "Category": main_name,
             "ID": main_ID,
+            "iscollect": False,
             "sub_data":[],
         }
 
@@ -254,6 +256,7 @@ def getNaverCate():
                 'Level': "중분류",
                 "Category": middle_name,
                 "ID" : middle_ID,
+                "iscollect": False,
                 "sub_data": [],
             }   
 
@@ -288,6 +291,7 @@ def getNaverCate():
                         'Level': "소분류",
                         "Category": sub_name,
                         "ID": sub_ID,
+                        "iscollect": False,
                     } 
                     middle_categories['sub_data'].append(sub_categories)
                 
@@ -320,6 +324,7 @@ def getCoupangCate():
 
     category_data = {
         "collection_name" : "Coupang",
+        "iscollect": False,
         "sub_data" : [],
     }
     
@@ -362,6 +367,7 @@ def getCoupangCate():
             "Level": "대분류",
             "Category": main_name,
             "ID": main_ID,
+            "iscollect": False,
             "sub_data":[],
         }
 
@@ -386,6 +392,7 @@ def getCoupangCate():
                 'Level': "중분류",
                 "Category": middle_name,
                 "ID" : middle_ID,
+                "iscollect": False,
                 "sub_data": [],
             }   
 
@@ -415,6 +422,7 @@ def getCoupangCate():
                     'Level': "소분류",
                     "Category": sub_name,
                     "ID": sub_ID,
+                    "iscollect": False,
                 } 
                 middle_categories['sub_data'].append(sub_categories)
             
